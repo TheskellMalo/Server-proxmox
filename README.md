@@ -2,7 +2,7 @@
   <img src="https://raw.githubusercontent.com/proxmox/pve-docs/master/images/proxmox-logo.svg" alt="Proxmox VE" width="360">
 </p>
 
-<h1 align="center">Un hyperviseur Proxmox verrouillé</h1>
+<h1 align="center"> Pare-feu Proxmox nftables</h1>
 
 <p align="center">
   <b>Isolation complète d'un serveur Proxmox VE 9 : pare-feu nftables, zones SDN étanches, Internet pour les VMs.</b><br>
@@ -37,24 +37,7 @@ IPSet, alias, groupes de sécurité, règles de nœud, lecture des logs — verd
 
 ## L'architecture obtenue
 
-```
-                 ┌─────────────────────────────────────────────┐
-                 │              BOX / PASSERELLE              │
-                 │              192.168.1.1                   │
-                 └───────┬─────────────────────────▲───────────┘
-                         │ vmbr0 (192.168.1.100)   │ SNAT
-                 ┌───────┴─────────────────────────┴───────────┐
-                 │              NŒUD PROXMOX VE 9.2            │
-                 │   pare-feu nftables (in DROP / fwd DROP)   │
-                 └───────┬─────────────────────┬───────────────┘
-                         │ VNet Lab            │ VNet Games
-                  10.10.1.0/24           10.20.1.0/24
-                  gw 10.10.1.254         gw 10.20.1.254
-                  DHCP dnsmasq@zone1     DHCP dnsmasq@zone2
-                         │                     │
-                     VMs Lab  ◄── DROP ──►  VMs Games
-                   (isolées entre elles et du LAN — Internet OK)
-```
+<img width="1203" height="1464" alt="Architecture" src="https://github.com/user-attachments/assets/e99aeda6-b6a8-4cd1-8797-08f61b808324" />
 
 ## Comment y parvenir
 
