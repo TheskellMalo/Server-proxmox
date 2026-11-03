@@ -37,7 +37,7 @@ IPSet, alias, groupes de sécurité, règles de nœud, lecture des logs — verd
 
 ## L'architecture obtenue
 
-<img width="601,5" height="732" alt="Architecture" src="https://github.com/user-attachments/assets/e99aeda6-b6a8-4cd1-8797-08f61b808324" />
+<img width="300,75" height="366" alt="Architecture" src="https://github.com/user-attachments/assets/e99aeda6-b6a8-4cd1-8797-08f61b808324" />
 
 ## Comment y parvenir
 
