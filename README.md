@@ -72,9 +72,6 @@ docs/
 procedures/
   deploiement-pare-feu.md — LA procédure réutilisable, pas à pas
   test-dhcp.md            — déboguer un DHCP récalcitrant (méthode universelle)
-archive/
-  conversation.md         — le résumé chronologique brut du projet
-  transcript-brut.md      — le transcript message par message
 ```
 
 ## Lire ce dépôt selon votre besoin
