@@ -15,21 +15,21 @@ Date : 1–3 novembre 2026. Toutes les images sont dans `images/`, nommées `<me
 - Schéma fourni : `fd4d2afe..._Pc5CF5D5-image.png` (BOX en haut, « isolé du LAN », Mon PC → Proxmox « Accès WEB + SSH », BOX → Proxmox « accès internet »).
 
 **Adressage identifié (ad232aa8)** :
-- LAN de la box : `192.168.142.0/24`, box/passerelle : `192.168.142.1`, plage DHCP dynamique `.150–.254`.
-- PC admin `arnaud-2.5-gb` (réservation DHCP statique, MAC `a0:36:9f:b3:1c:67`) : **`192.168.142.20`**.
-- Proxmox : **`192.168.142.103`** (ensuite confirmé sur `vmbr0`, port `nic0`).
+- LAN de la box : `192.168.1.0/24`, box/passerelle : `192.168.1.1`, plage DHCP dynamique `.150–.254`.
+- PC admin `poste-admin` (réservation DHCP statique, MAC `11:22:33:44:55:66`) : **`192.168.1.10`**.
+- Proxmox : **`192.168.1.100`** (ensuite confirmé sur `vmbr0`, port `nic0`).
 - Le PC est connecté en Ethernet **uniquement via la box** (pas de lien dédié).
 
 ## 2. Conception retenue
 
-- `vmbr0` (ponté sur `nic0`) : `192.168.142.103/24`, gateway `192.168.142.1` — seul lien vers la box/Internet.
+- `vmbr0` (ponté sur `nic0`) : `192.168.1.100/24`, gateway `192.168.1.1` — seul lien vers la box/Internet.
 - **SDN** (zones `Simple`, pas VLAN car la box ne gère pas le 802.1Q) :
   - zone `zones1` → VNet **`LANlab`** (« home network labo ») → subnet **`10.10.1.0/24`**, gateway `10.10.1.254`, **SNAT coché**, DHCP range `10.10.1.225–10.10.1.253`.
   - zone `zones2` → VNet **`Glab`** (« VM games ») → subnet **`10.20.1.0/24`**, gateway `10.20.1.254`, **SNAT coché**, DHCP range `10.20.1.225–10.20.1.253`.
 - Pare-feu datacenter : `policy_in DROP`, `policy_out ACCEPT`, `policy_forward DROP`.
 - Règles prévues (IP en dur, **pas d'IPSet**) :
-  - IN : ACCEPT tcp 22 et 8006 depuis `192.168.142.20/32` → `192.168.142.103/32` ; DROP `192.168.142.0/24` → `.103` (log warning).
-  - OUT : ACCEPT DNS (udp+tcp 53) et NTP (udp 123) vers `192.168.142.1/32` ; ACCEPT DNS vers `192.168.142.99/32` (DNS interne de l'utilisateur, ajouté plus tard) ; DROP vers `192.168.142.0/24`.
+  - IN : ACCEPT tcp 22 et 8006 depuis `192.168.1.10/32` → `192.168.1.100/32` ; DROP `192.168.1.0/24` → `.103` (log warning).
+  - OUT : ACCEPT DNS (udp+tcp 53) et NTP (udp 123) vers `192.168.1.1/32` ; ACCEPT DNS vers `192.168.1.53/32` (DNS interne de l'utilisateur, ajouté plus tard) ; DROP vers `192.168.1.0/24`.
   - FORWARD : 6 DROP (LANlab↔Glab, LANlab/Glab→LAN, vmbr0→LANlab/Glab) puis 2 ACCEPT (`10.10.1.0/24`, `10.20.1.0/24` → Internet via SNAT) ; policy DROP.
 - Décision : **Option A = backend nftables (`proxmox-firewall`)** car c'est le seul qui applique les règles FORWARD (le pare-feu iptables classique les ignore — confirmé par la doc officielle PVE 9.2).
 
@@ -44,8 +44,8 @@ Date : 1–3 novembre 2026. Toutes les images sont dans `images/`, nommées `<me
 - `net.ipv4.ip_forward = 0` → corrigé : `sysctl -w net.ipv4.ip_forward=1` + `/etc/sysctl.d/99-ip-forward.conf` → persistant = 1.
 
 ### 3.3 IPSet `management` trop large (b96ec404, 91826c30)
-- L'ipset auto `PVEFW-0-management-v4` contenait `192.168.142.0/24` + `.20` → ouvrait 22/8006/5900-5999/3128/60000-60050 à **tout le LAN**.
-- Corrigé via alias : `[ALIASES] local_network 192.168.142.103/32` + `cluster_network 192.168.142.103/32` → le set ne contient plus que `.103` (et `.20` ajouté manuellement, puis décision finale : **supprimer l'IPSet management**, IP en dur dans les règles).
+- L'ipset auto `PVEFW-0-management-v4` contenait `192.168.1.0/24` + `.20` → ouvrait 22/8006/5900-5999/3128/60000-60050 à **tout le LAN**.
+- Corrigé via alias : `[ALIASES] local_network 192.168.1.100/32` + `cluster_network 192.168.1.100/32` → le set ne contient plus que `.103` (et `.20` ajouté manuellement, puis décision finale : **supprimer l'IPSet management**, IP en dur dans les règles).
 - `grep -rn "management" /etc/pve/firewall/` → rien ; c'est un ipset système auto-généré.
 
 ### 3.4 Bascule vers le backend nftables (81d51f90, a63655cb, a74256cd)
@@ -64,8 +64,8 @@ Date : 1–3 novembre 2026. Toutes les images sont dans `images/`, nommées `<me
 - Le TRACE montrait `policy_forward: ACCEPT` (hérité) → remis à **DROP** dans `Datacenter → Firewall → Options`. Vérifié : `pvesh get /cluster/firewall/options` → DROP.
 
 ### 3.7 DNS du nœud bloquait `apt` (3ad13edc)
-- `pve → System → DNS` pointait sur `192.168.142.99` (DNS interne) ; la règle `OUT DROP 192.168.142.0/24` bloquait → `Temporary failure resolving 'deb.debian.org'`.
-- L'utilisateur a choisi de **garder `.99`** → ajout de 2 règles OUT ACCEPT (udp+tcp 53) vers `192.168.142.99/32` **avant** le DROP. Vérifié en nft : `oifname "vmbr0" udp dport 53 ip daddr 192.168.142.99 accept` (+ tcp). `apt update` repasse ✅.
+- `pve → System → DNS` pointait sur `192.168.1.53` (DNS interne) ; la règle `OUT DROP 192.168.1.0/24` bloquait → `Temporary failure resolving 'deb.debian.org'`.
+- L'utilisateur a choisi de **garder `.99`** → ajout de 2 règles OUT ACCEPT (udp+tcp 53) vers `192.168.1.53/32` **avant** le DROP. Vérifié en nft : `oifname "vmbr0" udp dport 53 ip daddr 192.168.1.53 accept` (+ tcp). `apt update` repasse ✅.
 
 ### 3.8 dnsmasq / DHCP SDN (6d1dc365, a130a1ed, 3ad13edc, af180f13, 19649550, 395a8c60, 51400b20, e441325b, d08c61bc)
 - Symptôme : VM Windows 100 en APIPA `169.254.196.216`, `ipconfig /renew` = « Impossible de contacter votre serveur DHCP » (b59875a0, 395a8c60_WNSsHGjv).
@@ -73,9 +73,9 @@ Date : 1–3 novembre 2026. Toutes les images sont dans `images/`, nommées `<me
 - `pvesh set /cluster/sdn/zones/zones1 -dhcp dnsmasq` (+ zones2) → `zones.cfg` : `dhcp dnsmasq` + `ipam pve` ✅.
 - `pvesh set /cluster/sdn` (apply) → génère `/etc/dnsmasq.d/zones1/`, `zones2/` ; `ss -lunp | grep :67` → écoute sur `%LANlab:67` et `%Glab:67` ✅.
 - Conf générée : `dhcp-range=set:zones1-10.10.1.0-24,10.10.1.0,static,...` + `dhcp-ignore=tag:!known` → **mode static** : seules les MAC dans l'IPAM reçoivent un lease.
-- MAC de la VM 100 enregistrée : `/etc/dnsmasq.d/zones1/ethers` = `BC:24:11:5A:CD:F0,10.10.1.225` ✅.
+- MAC de la VM 100 enregistrée : `/etc/dnsmasq.d/zones1/ethers` = `AA:BB:CC:DD:EE:01,10.10.1.225` ✅.
 - « Automatic DHCP » sur la zone = choix **DHCP dynamique vs static par VM** (IPAM : VM sans IP fixée = dynamique dans la plage ; VM avec IP = statique).
-- L2 vérifié OK : `tap100i0 ... master LANlab state UP`, `qm config 100` → `net0: e1000=BC:24:11:5A:CD:F0,bridge=LANlab,firewall=1` (pas de `link=0`).
+- L2 vérifié OK : `tap100i0 ... master LANlab state UP`, `qm config 100` → `net0: e1000=AA:BB:CC:DD:EE:01,bridge=LANlab,firewall=1` (pas de `link=0`).
 - tcpdump sur LANlab pendant renew : **0 paquet** (premier test, renew interrompu par ^C) → à refaire proprement (voir procédure finale).
 - Règles firewall « DHCP DISCOVER » présentes et cochées (e441325b_vzkU1mkm).
 
@@ -83,17 +83,17 @@ Date : 1–3 novembre 2026. Toutes les images sont dans `images/`, nommées `<me
 
 | Élément | État |
 |---|---|
-| `vmbr0` | `192.168.142.103/24`, gw `192.168.142.1`, port `nic0` ✅ |
+| `vmbr0` | `192.168.1.100/24`, gw `192.168.1.1`, port `nic0` ✅ |
 | `ip_forward` | 1 persistant ✅ |
-| SDN | `LANlab`/`Glab` créés, IPs gateway `.254/24` sur les bridges, SNAT → `192.168.142.103` en POSTROUTING (x2, doublon inoffensif) ✅ |
+| SDN | `LANlab`/`Glab` créés, IPs gateway `.254/24` sur les bridges, SNAT → `192.168.1.100` en POSTROUTING (x2, doublon inoffensif) ✅ |
 | Backend pare-feu | nftables (`proxmox-firewall` actif, `pve-firewall` disabled, iptables→nft) ✅ |
 | Options DC | enable=1, in=DROP, out=ACCEPT, forward=DROP ✅ |
 | Règles IN/OUT hôte | 6 règles actives, IP en dur (`.20/32` pour 22/8006; DNS/NTP vers `.1`; DNS vers `.99`; DROP LAN) ✅ compilées en nft (`cluster-in` lignes 389-394) |
 | Règles FORWARD | 8 règles sans `-i`, compilées dans `cluster-forward` (6 DROP loggés + 2 ACCEPT + drop final) ✅ |
-| Aliases | `local_network`/`cluster_network` = `192.168.142.103/32` ✅ |
+| Aliases | `local_network`/`cluster_network` = `192.168.1.100/32` ✅ |
 | IPSet management | supprimé (plus d'ouverture auto du LAN) ✅ |
 | dnsmasq SDN | `dnsmasq@zones1`/`@zones2` actifs, UDP 67 sur LANlab/Glab, ethers contient la VM 100 ✅ |
-| VM 100 (Windows 10) | `net0: bridge=LANlab, firewall=1`, MAC `BC:24:11:5A:CD:F0` — **en attente de lease DHCP** (dernier point ouvert) |
+| VM 100 (Windows 10) | `net0: bridge=LANlab, firewall=1`, MAC `AA:BB:CC:DD:EE:01` — **en attente de lease DHCP** (dernier point ouvert) |
 
 ## 5. Point ouvert à la fin
 
@@ -103,12 +103,12 @@ La VM Windows 100 ne recevait pas encore de lease au moment de la dernière capt
 
 | Depuis | Test | Attendu |
 |---|---|---|
-| PC `.20` | `ssh root@192.168.142.103`, `https://192.168.142.103:8006` | ✅ |
-| Autre appareil LAN (téléphone Wi-Fi) | `ping 192.168.142.103`, port 8006 | ❌ (log Firewall → Log) |
+| PC `.20` | `ssh root@192.168.1.100`, `https://192.168.1.100:8006` | ✅ |
+| Autre appareil LAN (téléphone Wi-Fi) | `ping 192.168.1.100`, port 8006 | ❌ (log Firewall → Log) |
 | VM LANlab | `ping 8.8.8.8` | ✅ SNAT |
-| VM LANlab | `ping 10.20.1.x` (Glab), `ping 192.168.142.20` | ❌ ❌ |
+| VM LANlab | `ping 10.20.1.x` (Glab), `ping 192.168.1.10` | ❌ ❌ |
 | VM Glab | `ping 8.8.8.8` puis `ping 10.10.1.x` | ✅ puis ❌ |
 | VM LANlab | `ping 10.10.1.y` (même groupe) | ✅ L2 intra-bridge |
 | Autre appareil LAN | `ping 10.10.1.x` | ❌ |
-| Hôte | `ping 192.168.142.20` / `apt update` | ❌ / ✅ |
+| Hôte | `ping 192.168.1.10` / `apt update` | ❌ / ✅ |
 | Reboot | tout persiste | ✅ |

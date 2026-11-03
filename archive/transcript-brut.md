@@ -16,11 +16,11 @@ Légende : chaque entrée = un message utilisateur (id) avec ses images, puis la
 **Assistant** : tableau détaillé OUTPUT (lo, vmbr1/vmbr2, DNS/NTP via box, DROP vers LAN, policy_out ACCEPT pour Internet) + extrait `cluster.fw` + points d'attention (ESTABLISHED auto, ordre des règles).
 
 ## M4 — ad232aa8 — Vraies valeurs box + IP Proxmox + captures
-**Images** : `ad232aa8..._Itafk1xP-image.png` (DHCP box : gateway 192.168.142.1, mask /24, range .150-.254), `ad232aa8..._JwVDXxuz-image.png` (lease statique : MAC a0:36:9f:b3:1c:67 → 192.168.142.20, hostname arnaud-2.5-gb)
-**Assistant** : tableau complet des règles avec valeurs réelles (LAN 192.168.142.0/24, box .1, PC .20/32, Proxmox .103), fichier `cluster.fw` complet, `/etc/network/interfaces` (vmbr0/vmbr1/vmbr2), NAT MASQUERADE, ordre de déploiement, tests.
+**Images** : `ad232aa8..._Itafk1xP-image.png` (DHCP box : gateway 192.168.1.1, mask /24, range .150-.254), `ad232aa8..._JwVDXxuz-image.png` (lease statique : MAC 11:22:33:44:55:66 → 192.168.1.10, hostname poste-admin)
+**Assistant** : tableau complet des règles avec valeurs réelles (LAN 192.168.1.0/24, box .1, PC .20/32, Proxmox .103), fichier `cluster.fw` complet, `/etc/network/interfaces` (vmbr0/vmbr1/vmbr2), NAT MASQUERADE, ordre de déploiement, tests.
 
 ## M5 — 86be3a0d — Le PC est en /24 pas /32
-**Assistant** : clarification — le /24 est le masque de l'interface du PC ; dans les règles on garde `192.168.142.20/32` pour n'autoriser **que** ce PC (sinon tout le LAN aurait accès).
+**Assistant** : clarification — le /24 est le masque de l'interface du PC ; dans les règles on garde `192.168.1.10/32` pour n'autoriser **que** ce PC (sinon tout le LAN aurait accès).
 
 ## M6 — 53fee3ab — "Reprenons le déploiement"
 **Assistant** : plan complet en 5 étapes (prérequis, SDN zones/VNet/subnets SNAT, pare-feu cluster.fw, activation, tests) + tableau des flux + consignes de sécurité (console physique).
@@ -32,7 +32,7 @@ Légende : chaque entrée = un message utilisateur (id) avec ses images, puis la
 **Assistant** : IPSet = nommage, même filtrage. Tableau avec +management/+lan/+box/+g1/+g2. Avertissement : ne pas mettre le /24 dans management.
 
 ## M9 — 8b0691e5 — Et le IPSet "management" préconfiguré ?
-**Assistant** : vérifier son contenu (`pvesh get /cluster/firewall/ipset/management`), doit contenir uniquement 192.168.142.20.
+**Assistant** : vérifier son contenu (`pvesh get /cluster/firewall/ipset/management`), doit contenir uniquement 192.168.1.10.
 
 ## M10 — 30041b14 — Oublie l'ipset, reprenons le déploiement
 **Assistant** : plan de déploiement complet avec vraies valeurs.
@@ -42,7 +42,7 @@ Légende : chaque entrée = un message utilisateur (id) avec ses images, puis la
 **Assistant** : tableau corrigé avec `LANlab`/`Glab` et `10.20.1.0/24` ; points à vérifier (Apply SDN, `ip link`, firewall enable, carte de vmbr0) + tests.
 
 ## M12 — 17d7752a — 3 captures : état réel
-**Images** : `17d7752a..._EebUycqa` (`ip link` : nic0, vmbr0, Glab), `..._qD9WY0qv` (Datacenter Options : Firewall Yes, ebtables Yes, in DROP/out ACCEPT/forward DROP), `..._29gR0fwY` (Network : vmbr0 Linux Bridge, ports nic0, CIDR 192.168.142.103/24, gateway 192.168.142.1)
+**Images** : `17d7752a..._EebUycqa` (`ip link` : nic0, vmbr0, Glab), `..._qD9WY0qv` (Datacenter Options : Firewall Yes, ebtables Yes, in DROP/out ACCEPT/forward DROP), `..._29gR0fwY` (Network : vmbr0 Linux Bridge, ports nic0, CIDR 192.168.1.100/24, gateway 192.168.1.1)
 **Assistant** : état OK ; ce qui manque = les règles (policy DROP actif = tout bloqué sauf established). Tableau 14 règles + `cluster.fw` + `pve-firewall restart` + tests.
 
 ## M13 — 02dc7968 — `ip link | grep` vide (erreur) + cluster.fw affiché
@@ -58,21 +58,21 @@ Légende : chaque entrée = un message utilisateur (id) avec ses images, puis la
 **Assistant** : 2 problèmes — (1) ip_forward=0 → `sysctl -w` + `/etc/sysctl.d/99-ip-forward.conf` ; (2) syntaxe iptables refusée → ne garder que [OPTIONS], recréer via UI ; astuce `cat` du fichier après 1ère règle UI. Conséquence : avec policy_in DROP et 0 règle, tout est déjà coupé → console physique.
 
 ## M16 — c7784536 — Suite : ip_forward=1 OK, mais toujours 16 erreurs de parse + dump complet
-**Assistant** : analyse du dump — règles custom rejetées, mais ipset `management` auto = 192.168.142.0/24 ouvre 22/8006/5900-5999/3128/60000-60050 à tout le LAN (trou à fermer) ; `bridge-nf-call-iptables=0`. Plan : vider [RULES], recréer via UI, puis réduire management à .20/32.
+**Assistant** : analyse du dump — règles custom rejetées, mais ipset `management` auto = 192.168.1.0/24 ouvre 22/8006/5900-5999/3128/60000-60050 à tout le LAN (trou à fermer) ; `bridge-nf-call-iptables=0`. Plan : vider [RULES], recréer via UI, puis réduire management à .20/32.
 
 ## M17 — 1288cd09 — Fichier vidé (IN ACCEPT -i lo seul), compile OK (0 erreur)
 **Assistant** : ok ; `pvesh create /cluster/firewall/rules -type in ...` a marché → syntaxe API = `-source/-dest/-p/-dport/-iface` ; mais `-out-interface`/`-in-interface` = Unknown option.
 
 ## M18 — faeb7bd5 — Résultat pvesh + grep management vide
-**User** : `cluster.fw` montre la règle écrite proprement : `IN ACCEPT -i vmbr0 -source 192.168.142.20/32 -dest 192.168.142.103/32 -p tcp -dport 22` ; `grep -rn management /etc/pve/firewall/` = rien ; `pvesh get ipset` vide.
-**Assistant** : cause trouvée — syntaxe fichier ≠ syntaxe iptables brute. Doc officielle citée. Nouveau plan UI-only + correction IPSet management (192.168.142.20/32) + `local_network` alias.
+**User** : `cluster.fw` montre la règle écrite proprement : `IN ACCEPT -i vmbr0 -source 192.168.1.10/32 -dest 192.168.1.100/32 -p tcp -dport 22` ; `grep -rn management /etc/pve/firewall/` = rien ; `pvesh get ipset` vide.
+**Assistant** : cause trouvée — syntaxe fichier ≠ syntaxe iptables brute. Doc officielle citée. Nouveau plan UI-only + correction IPSet management (192.168.1.10/32) + `local_network` alias.
 
 ## M19 — 760bddc8 — "Et pour les VNet isolés entre eux & pas avec mon LAN ?" + capture rules
 **Image** : `760bddc8..._4cq5BH0Z` (Datacenter Firewall Rules : lignes 0-2 avec On ☐ DÉCOCHÉ, source +dc/management)
 **Assistant** + recherche web : doc PVE 9.2 confirme — **règles FORWARD ignorées par pve-firewall iptables classique**, seulement avec proxmox-firewall (nftables, tech preview). Deux options A (nftables) / B (pare-feu par VM). Question posée.
 
 ## M20 — 91826c30 — "Est-ce que je supprime ?" + capture Aliases
-**Image** : `91826c30..._Ygjn2jj5` (Aliases : cluster_network 192.168.142.103, local_network 192.168.142.103)
+**Image** : `91826c30..._Ygjn2jj5` (Aliases : cluster_network 192.168.1.100, local_network 192.168.1.100)
 **Assistant** : NON ne pas supprimer — ce sont les alias système qui ferment le trou. Étapes UI : vider IPSet management, options, 7 règles avec .20/32 en dur, pare-feu par VM (Input DROP + out DROP LAN), vérifs, tests.
 
 ## M21 — 82c276c8 — Pourquoi remettre la règle out DROP sur chaque VM si présente au datacenter ?
@@ -99,7 +99,7 @@ Légende : chaque entrée = un message utilisateur (id) avec ses images, puis la
 ## M28 — a74256cd — Après correction : host.fw = nftables:1 + enable:1, mais toujours PVEFW=0, iptables→legacy
 **Assistant** : la bascule demande le restart des services + alternatives ; résultat partiel (table proxmox-firewall existe).
 
-## M29 — b92bd9e2 — Vérifs : `v4-dc/management` = {192.168.142.103} seul ✅, options DROP/ACCEPT/DROP ✅, 6 règles IN/OUT présentes, ipset management supprimé ("no such IPSet")
+## M29 — b92bd9e2 — Vérifs : `v4-dc/management` = {192.168.1.100} seul ✅, options DROP/ACCEPT/DROP ✅, 6 règles IN/OUT présentes, ipset management supprimé ("no such IPSet")
 **Assistant** : il manque les 6 règles forward → les créer, restart, vérifs nft, reboot VMs, tests.
 
 ## M30 — 6147135c — "Comment mettre Interface In & Out en GUI ?" + capture formulaire Add: Rule (Direction=forward)
@@ -127,36 +127,36 @@ Légende : chaque entrée = un message utilisateur (id) avec ses images, puis la
 **Assistant** : 🎉 tout est vert côté règles. Dernière étape : `qm reboot` des VMs (obligatoire après bascule nftables) + les 10 tests finaux.
 
 ## M36 — 3c5ecc7c — "Ma VM n'a pas Internet, c'est le DNS local ?" + capture page DNS du nœud
-**Image** : `3c5ecc7c..._aJwkRbsM` (pve → System → DNS : search domain `virtualisation`, DNS server 1 = **192.168.142.99**)
+**Image** : `3c5ecc7c..._aJwkRbsM` (pve → System → DNS : search domain `virtualisation`, DNS server 1 = **192.168.1.53**)
 **Assistant** : non, d'abord diagnostiquer depuis la VM (ipconfig, ping gateway, ping 8.8.8.8, nslookup, tracert) + hôte (SNAT, forward rules, ip_forward). VM = Windows 10 → commandes cmd équivalentes fournies.
 
 ## M37 — b59875a0 — capture `ipconfig /all` Windows
-**Image** : `b59875a0..._UEFLDoBw` (DESKTOP-9M4PJOK, e1000, MAC BC-24-11-5A-CD-F0, DHCP activé, **APIPA 169.254.196.216**, pas de gateway)
+**Image** : `b59875a0..._UEFLDoBw` (WIN10-VM, e1000, MAC AA-BB-CC-DD-EE-01, DHCP activé, **APIPA 169.254.196.216**, pas de gateway)
 **Assistant** : pas de réponse DHCP → dnsmasq inactif. Commandes hôte : `systemctl is-active dnsmasq`, `ss -lunp | grep :67`, conf `/etc/dnsmasq.d/`, subnets SDN, `qm config 100 | grep net0`.
 
 ## M38 — 6d1dc365 — dnsmasq **inactive**, `pvesh get /cluster/sdn/subnets` = pas de handler, `qm config 100 | grep net0` OK (bridge=LANlab, firewall=1) + 2 captures
 **Images** : `6d1dc365..._9s7aK17U` (SDN VNets/Subnets : 10.10.1.0/24 gw .254 SNAT 1), `..._RV0nu1YF` (Edit Subnet → DHCP Ranges .225-.253)
 **Assistant** : dnsmasq pas installé → `apt install dnsmasq` + enable ; si conf vide → Apply SDN ; vérifier bridge VM ; test IP fixe manuel sur la VM.
 
-## M39 — a130a1ed — `pvesh set /cluster/sdn --apply 1` = pas de handler ; `systemctl enable dnsmasq` = unit n'existe pas ; `.running-config` montre les dhcp-range OK ; `qm config 100` → `net0: e1000=BC:24:11:5A:CD:F0,bridge=LANlab,firewall=1`
+## M39 — a130a1ed — `pvesh set /cluster/sdn --apply 1` = pas de handler ; `systemctl enable dnsmasq` = unit n'existe pas ; `.running-config` montre les dhcp-range OK ; `qm config 100` → `net0: e1000=AA:BB:CC:DD:EE:01,bridge=LANlab,firewall=1`
 **Image** : `a130a1ed..._QRyBBNUM` (terminal Windows)
 **Assistant** : installer dnsmasq d'abord ; puis enable. Recommandation : SDN lance des instances **par zone** (`dnsmasq@zones1`) → désactiver le service générique.
 
 ## M40 — bb00d045 — apt échoue : `Temporary failure resolving` (tous les repos) — le DNS .99 est bloqué par la règle OUT DROP
-**Assistant** : cause = règle OUT DROP vers 192.168.142.0/24 bloque le DNS .99. Deux options : (a) DNS nœud → 192.168.142.1 (box, déjà autorisée) ; (b) garder .99 + 2 règles OUT ACCEPT udp/tcp 53 vers 192.168.142.99/32 avant le DROP. Utilisateur choisit (b).
+**Assistant** : cause = règle OUT DROP vers 192.168.1.0/24 bloque le DNS .99. Deux options : (a) DNS nœud → 192.168.1.1 (box, déjà autorisée) ; (b) garder .99 + 2 règles OUT ACCEPT udp/tcp 53 vers 192.168.1.53/32 avant le DROP. Utilisateur choisit (b).
 
 ## M41 — c032264c — "J'ai juste à modifier cette ligne ?" + capture
-**Image** : `c032264c..._W45fNyHW` (règle firewall out/ACCEPT/DNS/192.168.142.1/32 — déjà correcte)
+**Image** : `c032264c..._W45fNyHW` (règle firewall out/ACCEPT/DNS/192.168.1.1/32 — déjà correcte)
 **Assistant** : non, cette règle est bonne, ne pas toucher. Le champ à changer serait System → DNS ; mais comme il garde .99, c'est la règle qu'il faut ajouter.
 
-## M42 — bea2c723 — "Mon DNS est sur 192.168.142.99, je dois changer la règle de pare-feu"
-**Assistant** : procédure exacte — insérer 2 règles OUT ACCEPT (udp 53 + tcp 53) vers 192.168.142.99/32 **avant** le DROP out.
+## M42 — bea2c723 — "Mon DNS est sur 192.168.1.53, je dois changer la règle de pare-feu"
+**Assistant** : procédure exacte — insérer 2 règles OUT ACCEPT (udp 53 + tcp 53) vers 192.168.1.53/32 **avant** le DROP out.
 
-## M43 — 3ad13edc — ✅ `resolv.conf` = nameserver 192.168.142.99, `getent hosts deb.debian.org` OK (IPv6 fastly), règles nft `udp/tcp dport 53 daddr 192.168.142.99 accept` présentes ; `apt update` OK ; **dnsmasq installé et actif** + capture
+## M43 — 3ad13edc — ✅ `resolv.conf` = nameserver 192.168.1.53, `getent hosts deb.debian.org` OK (IPv6 fastly), règles nft `udp/tcp dport 53 daddr 192.168.1.53 accept` présentes ; `apt update` OK ; **dnsmasq installé et actif** + capture
 **Image** : `3ad13edc..._1Tl5kdd3` (ipconfig /all Windows)
 **Assistant** : dnsmasq actif mais `/etc/dnsmasq.d/` = README seul → le SDN n'a pas généré la conf → forcer Apply SDN / bon endpoint API, restart dnsmasq, vérifier :67.
 
-## M44 — a0b26b19 — relance : dnsmasq tourne mais `/etc/dnsmasq.d/` = README seul ; logs : `using nameserver 192.168.142.99#53` ; `pvesh set /cluster/sdn --apply 1` silencieux
+## M44 — a0b26b19 — relance : dnsmasq tourne mais `/etc/dnsmasq.d/` = README seul ; logs : `using nameserver 192.168.1.53#53` ; `pvesh set /cluster/sdn --apply 1` silencieux
 **Assistant** + web_search : doc PVE 9.2 — le DHCP SDN nécessite le **plugin `dhcp dnsmasq` sur la zone** + dnsmasq installé ; instances par zone ; le service générique doit être désactivé. Commandes : `systemctl disable --now dnsmasq`, `pvesh set /cluster/sdn/zones/zones1 -dhcp dnsmasq` (+zones2), Apply (`pvesh set /cluster/sdn`), vérifs `dnsmasq@zones1`, `/etc/dnsmasq.d/zones1/`, `:67`.
 
 ## M45 — 1f90023b — ✅ zones.cfg = `dhcp dnsmasq` + `ipam pve` sur zones1/zones2 ; `dnsmasq@zones1` et `@zones2` **active (running)** ; `/etc/dnsmasq.d/zones1|zones2` créés ; `ss -lunp` : `0.0.0.0%Glab:67` et `0.0.0.0%LANlab:67` ✅ ; conf zones1 : `dhcp-ignore=tag:!known`, `dhcp-hostsfile=.../ethers`
@@ -171,14 +171,14 @@ Légende : chaque entrée = un message utilisateur (id) avec ses images, puis la
 **Assistant** : 0 paquet = blocage amont (renew interrompu par ^C aussi). Vérifier : règle DHCP cochée + ports 68→67, `qm config 100` (OK, bridge=LANlab), tcpdump synchronisé 40s sans ^C, `sc query dhcp` dans la VM, `cluster-in | grep 'dport 6[78]'`.
 
 ## M48 — e441325b — `ip link` : LANlab UP, `tap100i0 ... master LANlab` ✅ ; `qm reboot 100` (QGA timeout, normal) ; + 2 captures
-**Images** : `e441325b..._vzkU1mkm` (Firewall rules datacenter, lignes 0-1 : in vmbr0 ACCEPT SSH / WEB UI+SPICE, source 192.168.142.20/32), `..._WaWPwIT7` (cmd Windows : `ipconfig /renew` puis ^C)
+**Images** : `e441325b..._vzkU1mkm` (Firewall rules datacenter, lignes 0-1 : in vmbr0 ACCEPT SSH / WEB UI+SPICE, source 192.168.1.10/32), `..._WaWPwIT7` (cmd Windows : `ipconfig /renew` puis ^C)
 **Assistant** : L2 OK ; renouveler proprement sans ^C ; vérifier règle DHCP compilée ; activer Automatic DHCP ou IPAM ; test tcpdump + renew synchronisés.
 
-## M49 — af180f13 — `qm config 100 | grep net0` = `net0: e1000=BC:24:11:5A:CD:F0,bridge=LANlab,firewall=1` ✅ ; renew bloqué + capture
+## M49 — af180f13 — `qm config 100 | grep net0` = `net0: e1000=AA:BB:CC:DD:EE:01,bridge=LANlab,firewall=1` ✅ ; renew bloqué + capture
 **Image** : `af180f13..._OG3lmc8k`
 **Assistant** : Windows envoie DISCOVER, pas d'OFFER → `ethers` doit être relu (restart dnsmasq@zones1), ou `static` bloque, ou firewall UDP 67. Procédure tcpdump 40s + renew sans ^C + logs dnsmasq + `cluster-in | grep 67` + table bridge.
 
-## M50 — d08c61bc — `cat /etc/dnsmasq.d/zones1/ethers` = `BC:24:11:5A:CD:F0,10.10.1.225` ✅ (zones2/ethers n'existe pas, normal)
+## M50 — d08c61bc — `cat /etc/dnsmasq.d/zones1/ethers` = `AA:BB:CC:DD:EE:01,10.10.1.225` ✅ (zones2/ethers n'existe pas, normal)
 **Assistant** : MAC enregistrée → restart dnsmasq@zones1 pour relire ethers ; test tcpdump synchronisé ; si DISCOVER sans OFFER → dnsmasq (static/IPAM) ; si rien → VM ne émet pas (sc query dhcp) ; vérifier règle INPUT dport 67.
 
 ## M51 — 395a8c60 — "Solution 1 déjà en place depuis le début" + "je veux le choix static ou pas" + 2 captures
