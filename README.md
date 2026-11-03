@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Isolation complète d'un serveur Proxmox VE 9 : pare-feu nftables, zones SDN étanches, Internet pour les VMs.</b><br>
-  <i>Projet réel, mené de bout en bout — du cahier des charges à la validation après redémarrage.</i>
+  <i>Projet réel, mené de bout en bout — à la validation après redémarrage.</i>
 </p>
 
 ---
