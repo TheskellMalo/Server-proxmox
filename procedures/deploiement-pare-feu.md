@@ -1,4 +1,4 @@
-# Procédure générale — Déployer un pare-feu fonctionnel sur Proxmox VE (9.x)
+# Déployer le pare-feu sur Proxmox VE (9.x)
 
 Procédure générique, applicable à toute installation Proxmox VE 9.x (backend
 nftables). Elle ne présuppose aucun cahier des charges : les valeurs d'exemple
