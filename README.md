@@ -11,7 +11,7 @@
 
 ---
 
-## 📖 Ce que j'ai fait
+## Ce que j'ai fait
 
 Parti d'un hyperviseur Proxmox VE 9.2 installé « nu » sur le réseau local de la box, j'ai construit une infrastructure où :
 
@@ -35,7 +35,7 @@ IPSet, alias, groupes de sécurité, règles de nœud, lecture des logs — verd
 | Internet pour toutes les VMs (SNAT + DHCP + DNS) | ✅ validé — ping 8.8.8.8 et résolution OK |
 | Persistance après reboot | ✅ validé — re-test complet sans intervention |
 
-## 🗺️ L'architecture obtenue
+## L'architecture obtenue
 
 ```
                  ┌─────────────────────────────────────────────┐
@@ -56,7 +56,7 @@ IPSet, alias, groupes de sécurité, règles de nœud, lecture des logs — verd
                    (isolées entre elles et du LAN — Internet OK)
 ```
 
-## 🛠️ Comment y parvenir
+## Comment y parvenir
 
 La procédure complète, pas à pas et réutilisable, est dans
 **[`procedures/deploiement-pare-feu.md`](procedures/deploiement-pare-feu.md)**. Le chemin en résumé :
@@ -77,7 +77,7 @@ La procédure complète, pas à pas et réutilisable, est dans
 Chaque « ⚠️ Piège » de la procédure correspond à un problème réellement rencontré — le détail complet des
 diagnostics est dans [`docs/03-diagnostic.md`](docs/03-diagnostic.md).
 
-## 📚 Organisation du dépôt
+## Organisation du dépôt
 
 ```
 docs/
@@ -94,7 +94,7 @@ archive/
   transcript-brut.md      — le transcript message par message
 ```
 
-## 🧭 Lire ce dépôt selon votre besoin
+## Lire ce dépôt selon votre besoin
 
 | Vous voulez… | Allez à |
 |---|---|
